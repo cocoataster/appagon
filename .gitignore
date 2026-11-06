@@ -1,0 +1,19 @@
+# Guías descargadas: son de sus autores, se regeneran con rag/build_index.py
+data/guias/raw/
+data/guias/texto/
+data/guias/manual/*
+!data/guias/manual/Extractos*.txt
+__pycache__/
+.DS_Store
+
+# Fine-tuning: archivos pesados de construcción
+finetune/build/
+*.gguf
+
+# App iOS: llama.cpp, modelos y archivos generados
+app/vendor/
+app/Modelos/
+app/Contenido/datos/
+app/Info.plist
+app/build/
+app/Apagon.xcodeproj/
