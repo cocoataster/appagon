@@ -7,7 +7,7 @@ El mismo asistente que se evaluó en Python, dentro del iPhone y sin conexión:
 3. **Búsqueda en las guías**: EmbeddingGemma (GGUF, con llama.cpp) convierte la pregunta en un vector y se compara con `index.json` (431 trozos). Máximo 2 trozos por guía, las españolas primero.
 4. **Modelo**: Ministral 3 3B afinado (`ministral3-apagon.Q4_K_M.gguf`, 2,1 GB), temperatura 0, como en la evaluación. Mismo formato de mensaje que la plantilla de Ministral 3 en Ollama.
 
-**Los modelos no van dentro de la app.** La app pesa ~5 MB (índice de las guías, reglas y casos de prueba). La primera vez pide descargar los dos modelos (2,4 GB) de Hugging Face, **con Wi-Fi y antes de un apagón**: barra de progreso, comprueba el espacio libre, sigue donde iba si se corta («Reintentar») y comprueba la huella SHA-256 de cada archivo. Se guardan en *Application Support* fuera de la copia de iCloud. Menú ⋯ → «Borrar modelos descargados» para volver a probar la descarga.
+**Los modelos no van dentro de la app.** La app pesa ~5 MB (índice de las guías, reglas y casos de prueba). La primera vez pide descargar los dos modelos (2,4 GB) de Hugging Face, **con Wi-Fi y antes de un apagón**: barra de progreso, comprueba el espacio libre, sigue donde iba si se corta («Reintentar») y comprueba la huella SHA-256 de cada archivo. Se guardan en *Application Support* fuera de la copia de iCloud. Ajustes → Desarrollador → «Borrar modelos descargados» para volver a probar la descarga.
 
 - Asistente: [`cocoataster/ministral3-apagon-GGUF`](https://huggingface.co/cocoataster/ministral3-apagon-GGUF) (subido a mano desde la web el 2 nov; el nombre del repo está en `app/hf_repo.txt`).
 - Buscador: `ggml-org/embeddinggemma-300M-GGUF` (`embeddinggemma-300M-Q8_0.gguf`).
@@ -16,7 +16,7 @@ El mismo asistente que se evaluó en Python, dentro del iPhone y sin conexión:
 Mejoras para el móvil:
 - El mensaje de sistema se lee una vez y se reutiliza entre preguntas (solo se lee la parte nueva).
 - Se quitan los guiones de corte de línea que el modelo copia de los PDF («in-mediato»).
-- **Red de seguridad de las cifras:** si hay un dato calculado (margen de nevera, litros, cargas, días) y la respuesta del modelo no lo recoge o da otra cifra, la app muestra debajo «Dato calculado: …» con el resultado de la calculadora. Si el límite de la nevera ya se ha superado, comprueba que la respuesta lo diga. Se añadió tras ver en el simulador «4 horas de margen» en vez de 1 h. Casos de prueba en `Comprobacion.redSeguridad` (los ejecuta `check` y la Autocomprobación).
+- **Red de seguridad de las cifras:** si hay un dato calculado (margen de nevera, litros, cargas, días) y la respuesta del modelo no lo recoge o da otra cifra, la app muestra debajo «Dato calculado: …» con el resultado de la calculadora. Si el límite de la nevera ya se ha superado, comprueba que la respuesta lo diga. Se añadió tras ver en el simulador «4 horas de margen» en vez de 1 h. Casos de prueba en `Verification.safetyNet` (los ejecuta `check` y la Autocomprobación).
 - Indicador «Pensando… leyendo las guías (N s)» mientras lee el contexto, botón fijo de 112, pantalla oscura.
 - Debajo de cada respuesta: cálculo, fuentes consultadas y tiempos (búsqueda, 1.ª palabra, tokens/s).
 
@@ -33,8 +33,8 @@ El script instala `cmake` y `xcodegen` si faltan, compila llama.cpp para iOS (ve
 
 1. Abre `app/Apagon.xcodeproj`.
 2. Arriba, elige un simulador de iPhone (p. ej. iPhone 16) y pulsa ▶ (Cmd+R).
-3. Al lanzar desde Xcode, la app usa los modelos de `app/Modelos` sin descargarlos (variable `APAGON_MODELOS`). Para probar la descarga: menú ⋯ → «Borrar modelos descargados» → «Descargar ahora».
-4. En la app: menú ⋯ → **Autocomprobación**. Debe decir que reglas, calculadoras y sinónimos son iguales que en Python y cuántos trozos de la búsqueda coinciden con Ollama.
+3. Al lanzar desde Xcode, la app usa los modelos de `app/Modelos` sin descargarlos (variable `APAGON_MODELOS`). Para probar la descarga: Ajustes → Desarrollador → «Borrar modelos descargados» → «Descargar ahora».
+4. En la app: Ajustes → Desarrollador → **Autocomprobación**. Debe decir que reglas, calculadoras y sinónimos son iguales que en Python y cuántos trozos de la búsqueda coinciden con Ollama.
 
 **Resultado (2 nov):** reglas, calculadoras y sinónimos iguales que en Python en 160 de 160 preguntas; búsqueda con 237 de 240 trozos iguales que con Ollama (37 de 40 preguntas idénticas).
 
@@ -64,14 +64,16 @@ En el simulador el modelo corre solo en CPU (sin GPU): los tiempos **no** son lo
 | `exportar_datos.py` | Exporta reglas, índice y casos de prueba desde `eval/pipeline.py` |
 | `project.yml` | Descripción del proyecto de Xcode (XcodeGen) |
 | `Sources/Pipeline.swift` | Reglas, calculadoras, sinónimos, búsqueda y mensaje (sin el modelo) |
-| `Sources/Modelos.swift` | Descarga de los modelos: progreso, reanudar, espacio libre y huella SHA-256 |
+| `Sources/Models.swift` | Descarga de los modelos: progreso, reanudar, espacio libre y huella SHA-256 |
 | `Sources/Llama.swift` | llama.cpp: el modelo que escribe y el de los vectores |
-| `Sources/Asistente.swift` | Une las piezas, fuera del hilo de la interfaz |
+| `Sources/Assistant.swift` | Une las piezas, fuera del hilo de la interfaz |
 | `Sources/ContentView.swift` | Pestañas, lista de chats y el chat (se abre en una hoja) |
-| `Sources/Pantallas.swift` | Respuesta, guardadas e inventario (de momento solo la pantalla) |
-| `Sources/Historial.swift` | Conversaciones y respuestas guardadas en el móvil (UserDefaults); solo se muestran, cada pregunta se responde por separado |
-| `Sources/Conexion.swift` | Estado de la conexión (NWPathMonitor): solo importa para descargar los modelos |
-| `Sources/Tema.swift` | Color de acento (el ámbar de las diapositivas); el resto, componentes nativos de iOS |
+| `Sources/Screens.swift` | Respuesta, guardadas e inventario (de momento solo la pantalla) |
+| `Sources/History.swift` | Conversaciones y respuestas guardadas en el móvil (UserDefaults); solo se muestran, cada pregunta se responde por separado |
+| `Sources/Connectivity.swift` | Estado de la conexión (NWPathMonitor): solo importa para descargar los modelos |
+| `Sources/Settings.swift` | Pestaña Ajustes: modelos y su estado, guías consultadas y herramientas de desarrollo |
+| `Sources/Category.swift` | Categoría de cada respuesta guardada, por palabras clave de la pregunta |
+| `Sources/Theme.swift` | Colores de acento y del estado de la conexión; el resto, componentes nativos de iOS |
 | `check/main.swift` | Comprobación de reglas y calculadoras contra Python, sin simulador |
 
 No se suben al repo (`.gitignore`): `vendor/` (llama.cpp), `Modelos/` (GGUF), `Contenido/datos/` (se regenera), `build/` y `Apagon.xcodeproj` (se genera con XcodeGen).

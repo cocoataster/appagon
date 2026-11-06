@@ -8,130 +8,108 @@ struct ApagonApp: App {
 }
 
 struct ContentView: View {
-    // Un solo asistente para toda la app: si se creara otra vez, volvería a cargar los 2 GB del modelo.
-    @StateObject private var a = Asistente()
-    @StateObject private var historial = Historial()
-    @StateObject private var conexion = Conexion()
+    // A single assistant for the whole app: creating another would load the 2 GB model again.
+    @StateObject private var assistant = Assistant()
+    @StateObject private var history = History()
+    @StateObject private var connectivity = Connectivity()
 
     var body: some View {
         TabView {
             ChatsView()
                 .tabItem { Label("Chats", systemImage: "bubble.left.and.bubble.right") }
-            GuardadasView()
+            SavedView()
                 .tabItem { Label("Guardadas", systemImage: "bookmark") }
-            InventarioView()
+            InventoryView()
                 .tabItem { Label("Inventario", systemImage: "shippingbox") }
+            SettingsView()
+                .tabItem { Label("Ajustes", systemImage: "gearshape") }
         }
-        .tint(Tema.ambar)
-        .environmentObject(a)
-        .environmentObject(historial)
-        .environmentObject(conexion)
-        .preferredColorScheme(.dark)   // pantalla oscura: gasta menos batería
-        .task { await a.cargar() }
+        .tint(Theme.accent)
+        .environmentObject(assistant)
+        .environmentObject(history)
+        .environmentObject(connectivity)
+        .preferredColorScheme(.dark)   // dark screen: uses less battery
+        .task { await assistant.load() }
     }
 }
 
-/// Lista de chats. El lápiz abre uno nuevo y tocar una fila lo reabre, los dos en una hoja.
+/// Chat list. The pencil opens a new chat and tapping a row reopens one, both in a sheet.
 struct ChatsView: View {
-    @EnvironmentObject private var a: Asistente
-    @EnvironmentObject private var historial: Historial
-    @EnvironmentObject private var conexion: Conexion
-    @State private var chatAbierto = false
-    @State private var verComprobacion = false
-    @State private var confirmarBorrado = false
+    @EnvironmentObject private var assistant: Assistant
+    @EnvironmentObject private var history: History
+    @EnvironmentObject private var connectivity: Connectivity
+    @State private var isChatOpen = false
 
     var body: some View {
         NavigationStack {
             List {
-                switch a.estado {
-                case .faltanModelos, .descargando:
-                    Section { TarjetaDescarga() }
+                switch assistant.status {
+                case .modelsMissing, .downloading:
+                    Section { DownloadCard() }
                 default:
                     EmptyView()
                 }
 
-                if historial.conversaciones.isEmpty {
+                if history.conversations.isEmpty {
                     Section {
-                        Button { abrir(nil) } label: {
+                        Button { open(nil) } label: {
                             Label("Haz tu primera pregunta", systemImage: "square.and.pencil")
                         }
                     } footer: {
                         Text("El modelo y las guías oficiales están en el móvil: funciona sin conexión. Los chats se guardan aquí.")
                     }
                 } else {
-                    Section {
-                        ForEach(historial.conversaciones) { c in
-                            Button { abrir(c.id) } label: { fila(c) }
-                                .foregroundStyle(.primary)
-                        }
-                        .onDelete { indices in
-                            for id in indices.map({ historial.conversaciones[$0].id }) { historial.borrar(id) }
+                    ForEach(history.chatsByDay, id: \.day) { group in
+                        Section(title(group.day)) {
+                            ForEach(group.chats) { c in
+                                Button { open(c.id) } label: { row(c) }
+                                    .foregroundStyle(.primary)
+                            }
+                            .onDelete { indices in
+                                for id in indices.map({ group.chats[$0].id }) { history.delete(id) }
+                            }
                         }
                     }
                 }
             }
-            .tituloConEstado("Chats")
-            .overlay(alignment: .bottomTrailing) { Boton112().padding() }
+            .titleWithStatus("Chats")
+            .overlay(alignment: .bottomTrailing) { EmergencyCallButton().padding() }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { menu }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { abrir(nil) } label: { Image(systemName: "square.and.pencil") }
+                    Button { open(nil) } label: { Image(systemName: "square.and.pencil") }
                         .accessibilityLabel("Nuevo chat")
                 }
             }
-            .sheet(isPresented: $chatAbierto) {
+            .sheet(isPresented: $isChatOpen) {
                 ChatView()
-                    .environmentObject(a)
-                    .environmentObject(historial)
-                    .environmentObject(conexion)
-            }
-            .sheet(isPresented: $verComprobacion) {
-                NavigationStack {
-                    ScrollView {
-                        Text(a.comprobacion ?? "").font(.footnote.monospaced()).padding().textSelection(.enabled)
-                    }
-                    .navigationTitle("Autocomprobación")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar { Button("Cerrar") { verComprobacion = false } }
-                }
-            }
-            .confirmationDialog("Se borrarán todos los chats y las respuestas guardadas.",
-                                isPresented: $confirmarBorrado, titleVisibility: .visible) {
-                Button("Borrar todos los chats", role: .destructive) { historial.borrarTodo() }
+                    .environmentObject(assistant)
+                    .environmentObject(history)
+                    .environmentObject(connectivity)
             }
         }
     }
 
-    private func abrir(_ id: UUID?) {
-        if let id { historial.abrir(id) } else { historial.nueva() }
-        chatAbierto = true
+    private func open(_ id: UUID?) {
+        if let id { history.open(id) } else { history.newChat() }
+        isChatOpen = true
     }
 
-    private var menu: some View {
-        Menu {
-            Button {
-                Task { await a.autocomprobar(); verComprobacion = true }
-            } label: { Label("Autocomprobación", systemImage: "checkmark.seal") }
-                .disabled(a.ocupado)
-            Button(role: .destructive) { confirmarBorrado = true } label: {
-                Label("Borrar todos los chats", systemImage: "trash")
-            }
-            .disabled(historial.conversaciones.isEmpty)
-            Button(role: .destructive) {
-                Task { await a.borrarModelos() }
-            } label: { Label("Borrar modelos descargados", systemImage: "externaldrive.badge.minus") }
-                .disabled(a.ocupado && a.estado != .faltanModelos)
-        } label: { Image(systemName: "ellipsis") }
+    private func title(_ day: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) { return "Hoy" }
+        if calendar.isDateInYesterday(day) { return "Ayer" }
+        var format = Date.FormatStyle(locale: Locale(identifier: "es_ES")).weekday(.wide).day().month(.wide)
+        if !calendar.isDate(day, equalTo: Date(), toGranularity: .year) { format = format.year() }
+        return day.formatted(format)
     }
 
-    private func fila(_ c: Conversacion) -> some View {
+    private func row(_ c: Conversation) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(c.titulo).lineLimit(2)
+            Text(c.title).lineLimit(2)
             HStack {
-                Text(c.mensajes.count == 1 ? "1 pregunta" : "\(c.mensajes.count) preguntas")
-                if c.mensajes.contains(where: \.guardado) { Image(systemName: "bookmark.fill") }
+                if c.messages.contains(where: \.isSaved) { Image(systemName: "bookmark.fill") }
                 Spacer()
-                Text(c.fecha.formatted(.relative(presentation: .named)))
+                Text(c.date.formatted(date: .omitted, time: .shortened))
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -140,41 +118,43 @@ struct ChatsView: View {
     }
 }
 
-/// Un chat, en una hoja. Si se cierra mientras responde, la respuesta se guarda igual al terminar.
+/// A chat, in a sheet: a single question and its answer. If closed while answering, the answer is still saved when it finishes.
 struct ChatView: View {
-    @EnvironmentObject private var a: Asistente
-    @EnvironmentObject private var historial: Historial
-    @Environment(\.dismiss) private var cerrar
-    @State private var texto = ""
-    @FocusState private var enfocado: Bool
+    @EnvironmentObject private var assistant: Assistant
+    @EnvironmentObject private var history: History
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @FocusState private var isInputFocused: Bool
 
-    private let sugerencias = [
+    private let suggestions = [
         "Se ha ido la luz hace 3 horas, ¿la comida de la nevera sigue siendo segura?",
         "Somos 4 en casa, ¿cuánta agua necesitamos para 3 días?",
         "¿Qué emisora de radio sigo durante el apagón y cómo la escucho sin luz?",
     ]
 
-    /// La conversación que se ve es la que está esperando respuesta.
-    private var enCurso: Bool { historial.respondiendo == historial.actual }
+    /// The visible conversation is the one waiting for an answer.
+    private var isResponding: Bool { history.respondingID == history.currentID }
+    /// Each chat takes one question: if it fails, nothing is saved and it can be retried.
+    private var acceptsQuestion: Bool { history.currentMessages.isEmpty && !isResponding }
 
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        if historial.mensajesActuales.isEmpty && !enCurso { sugerenciasVista }
+                        if acceptsQuestion { suggestionsView }
 
-                        ForEach(historial.mensajesActuales) { m in
-                            BurbujaPregunta(texto: m.pregunta)
-                            VistaRespuesta(m: m)
+                        ForEach(history.currentMessages) { m in
+                            QuestionBubble(text: m.question)
+                            AnswerView(m: m)
                         }
 
-                        if enCurso {
-                            BurbujaPregunta(texto: a.pregunta)
-                            respuestaEnCurso
+                        if isResponding {
+                            QuestionBubble(text: assistant.question)
+                            streamingAnswer
                         }
 
-                        estadoVista
+                        statusView
 
                         Text("No sustituye a los servicios de emergencia. Si hay riesgo para la vida, llama al 112.")
                             .font(.footnote)
@@ -184,32 +164,36 @@ struct ChatView: View {
                     .padding()
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .onChange(of: a.respuesta) { proxy.scrollTo("fin", anchor: .bottom) }
-                .onChange(of: historial.respondiendo) { proxy.scrollTo("fin", anchor: .bottom) }
-                .onAppear { if !historial.mensajesActuales.isEmpty { proxy.scrollTo("fin", anchor: .bottom) } }
+                .onChange(of: assistant.answer) { proxy.scrollTo("fin", anchor: .bottom) }
+                .onChange(of: history.respondingID) { proxy.scrollTo("fin", anchor: .bottom) }
+                .onAppear { if !history.currentMessages.isEmpty { proxy.scrollTo("fin", anchor: .bottom) } }
             }
-            .overlay(alignment: .bottomTrailing) { Boton112().padding() }   // queda encima de la caja de texto
             .safeAreaInset(edge: .bottom) {
-                entrada
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(Color(.systemBackground))   // color fijo, sin desenfoque: no recalcula nada al desplazar
+                if acceptsQuestion {
+                    inputBar
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .background(Color(.systemBackground))   // solid color, no blur: nothing is recomputed while scrolling
+                }
             }
-            .tituloConEstado(historial.mensajesActuales.isEmpty && !enCurso ? "Nuevo chat" : "Chat")
+            .titleWithStatus(acceptsQuestion ? "Nuevo chat" : "Chat")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("Cerrar") { cerrar() } }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("Cerrar")
+                }
             }
         }
-        .onAppear { if historial.mensajesActuales.isEmpty && !a.ocupado { enfocado = true } }
+        .onAppear { if history.currentMessages.isEmpty && !assistant.isBusy { isInputFocused = true } }
     }
 
-    private var sugerenciasVista: some View {
+    private var suggestionsView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Prueba con").font(.footnote).foregroundStyle(.secondary)
             VStack(spacing: 0) {
-                ForEach(Array(sugerencias.enumerated()), id: \.offset) { i, s in
+                ForEach(Array(suggestions.enumerated()), id: \.offset) { i, s in
                     if i > 0 { Divider().padding(.leading) }
-                    Button { enviar(s) } label: {
+                    Button { send(s) } label: {
                         Text(s)
                             .font(.subheadline)
                             .multilineTextAlignment(.leading)
@@ -219,22 +203,22 @@ struct ChatView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .disabled(a.ocupado)
-                    .foregroundStyle(a.ocupado ? .secondary : .primary)
+                    .disabled(assistant.isBusy)
+                    .foregroundStyle(assistant.isBusy ? .secondary : .primary)
                 }
             }
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
         }
     }
 
-    @ViewBuilder private var respuestaEnCurso: some View {
-        if a.respuesta.isEmpty {
+    @ViewBuilder private var streamingAnswer: some View {
+        if assistant.answer.isEmpty {
             HStack(spacing: 8) {
                 ProgressView()
-                switch a.estado {
-                case .leyendo(let desde):
-                    TimelineView(.periodic(from: desde, by: 1)) { ctx in
-                        Text("Leyendo las guías… \(Int(ctx.date.timeIntervalSince(desde))) s")
+                switch assistant.status {
+                case .reading(let since):
+                    TimelineView(.periodic(from: since, by: 1)) { ctx in
+                        Text("Leyendo las guías… \(Int(ctx.date.timeIntervalSince(since))) s")
                     }
                 default:
                     Text("Buscando en las guías…")
@@ -243,21 +227,21 @@ struct ChatView: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
         } else {
-            Text(a.respuesta)
+            Text(assistant.answer)
         }
     }
 
-    @ViewBuilder private var estadoVista: some View {
-        switch a.estado {
-        case .cargando:
+    @ViewBuilder private var statusView: some View {
+        switch assistant.status {
+        case .loading:
             Label { Text("Cargando el modelo…") } icon: { ProgressView() }
                 .font(.subheadline).foregroundStyle(.secondary)
         case .error(let m):
             Label(m, systemImage: "exclamationmark.triangle")
                 .font(.subheadline).foregroundStyle(.orange)
-        case .faltanModelos, .descargando:
-            TarjetaDescarga()
-        case .comprobando(let t):
+        case .modelsMissing, .downloading:
+            DownloadCard()
+        case .verifying(let t):
             Label { Text(t) } icon: { ProgressView() }
                 .font(.subheadline).foregroundStyle(.secondary)
         default:
@@ -265,85 +249,85 @@ struct ChatView: View {
         }
     }
 
-    private var entrada: some View {
+    private var inputBar: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField("Escribe tu pregunta…", text: $texto, axis: .vertical)
+            TextField("Escribe tu pregunta…", text: $text, axis: .vertical)
                 .lineLimit(1...4)
-                .focused($enfocado)
+                .focused($isInputFocused)
                 .submitLabel(.send)
-                .onSubmit { enviar(texto) }
+                .onSubmit { send(text) }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
-            Button { enviar(texto) } label: {
+            Button { send(text) } label: {
                 Image(systemName: "arrow.up.circle.fill").font(.system(size: 32))
             }
-            .disabled(!puedeEnviar)
+            .disabled(!canSend)
             .accessibilityLabel("Enviar")
         }
     }
 
-    private var puedeEnviar: Bool { !a.ocupado && !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var canSend: Bool { !assistant.isBusy && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    private func enviar(_ q: String) {
-        guard !a.ocupado, !q.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let id = historial.actual
-        historial.respondiendo = id
-        texto = ""
-        enfocado = false
+    private func send(_ q: String) {
+        guard !assistant.isBusy, !q.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let id = history.currentID
+        history.respondingID = id
+        text = ""
+        isInputFocused = false
         Task {
-            if let m = await a.preguntar(q) {
-                historial.agregar(m, a: id)
-            } else if texto.isEmpty {
-                texto = q   // si falla, la pregunta vuelve a la caja para reintentar
+            if let m = await assistant.ask(q) {
+                history.add(m, to: id)
+            } else if text.isEmpty {
+                text = q   // on failure, the question goes back in the box to retry
             }
-            historial.respondiendo = nil
+            history.respondingID = nil
         }
     }
 }
 
-/// Aviso para descargar los modelos (o su progreso), en la lista de chats y dentro del chat.
-struct TarjetaDescarga: View {
-    @EnvironmentObject private var a: Asistente
-    @EnvironmentObject private var conexion: Conexion
+/// Prompt to download the models (or their progress), in the chat list and inside a chat.
+struct DownloadCard: View {
+    @EnvironmentObject private var assistant: Assistant
+    @EnvironmentObject private var connectivity: Connectivity
 
     var body: some View {
-        switch a.estado {
-        case .descargando(let texto, let fraccion):
+        switch assistant.status {
+        case .downloading(let text, let fraction):
             VStack(alignment: .leading, spacing: 8) {
                 Label("Descargando el asistente", systemImage: "arrow.down.circle").font(.headline)
-                ProgressView(value: fraccion)
-                Text(texto).font(.footnote.monospacedDigit())
+                ProgressView(value: fraction)
+                Text(text).font(.footnote.monospacedDigit())
                 Text("No cierres la app hasta que termine.").font(.caption).foregroundStyle(.secondary)
             }
         default:
             VStack(alignment: .leading, spacing: 10) {
                 Label("Falta descargar el asistente", systemImage: "arrow.down.circle").font(.headline)
-                Text("Para funcionar sin conexión necesita descargar \(a.pendiente) una sola vez. Hazlo ahora, con Wi-Fi y con la app abierta: durante un apagón ya no se podrá.")
+                Text("Para funcionar sin conexión necesita descargar \(assistant.pendingSize) una sola vez. Hazlo ahora, con Wi-Fi y con la app abierta: durante un apagón ya no se podrá.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                if !conexion.enLinea {
+                if !connectivity.isOnline {
                     Label("Sin conexión. Conéctate a una Wi-Fi para descargarlo.", systemImage: "wifi.slash")
                         .font(.footnote).foregroundStyle(.orange)
-                } else if conexion.datosMoviles {
+                } else if connectivity.isCellular {
                     Label("Estás con datos móviles: mejor con Wi-Fi.", systemImage: "antenna.radiowaves.left.and.right")
                         .font(.footnote).foregroundStyle(.orange)
                 }
-                if let e = a.errorDescarga {
+                if let e = assistant.downloadError {
                     Text(e).font(.footnote).foregroundStyle(.orange)
                 }
-                Button(a.errorDescarga == nil ? "Descargar ahora" : "Reintentar") {
-                    Task { await a.descargar() }
+                Button(assistant.downloadError == nil ? "Descargar ahora" : "Reintentar") {
+                    Task { await assistant.download() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!conexion.enLinea)
+                .disabled(!connectivity.isOnline)
             }
         }
     }
 }
 
-/// Botón flotante y redondo para llamar al 112, siempre abajo a la derecha.
-struct Boton112: View {
+/// Round floating button to call 112, always at the bottom right.
+struct EmergencyCallButton: View {
     var body: some View {
         Link(destination: URL(string: "tel:112")!) {
             Label("112", systemImage: "phone.fill")
