@@ -124,6 +124,7 @@ struct ChatView: View {
     @EnvironmentObject private var history: History
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
+    @State private var justAnswered = false   // answered in this visit, not an old chat being reread
     @FocusState private var isInputFocused: Bool
 
     private let suggestions = [
@@ -163,7 +164,8 @@ struct ChatView: View {
                     }
                     .padding()
                 }
-                .scrollDismissesKeyboard(.interactively)
+                .scrollDismissesKeyboard(.immediately)
+                .onTapGesture { isInputFocused = false }
                 .onChange(of: assistant.answer) { proxy.scrollTo("fin", anchor: .bottom) }
                 .onChange(of: history.respondingID) { proxy.scrollTo("fin", anchor: .bottom) }
                 .onAppear { if !history.currentMessages.isEmpty { proxy.scrollTo("fin", anchor: .bottom) } }
@@ -174,6 +176,11 @@ struct ChatView: View {
                         .padding(.horizontal)
                         .padding(.vertical, 8)
                         .background(Color(.systemBackground))   // solid color, no blur: nothing is recomputed while scrolling
+                } else if !isResponding, let answered = history.currentMessages.last {
+                    actionBar(answered)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .background(Color(.systemBackground))
                 }
             }
             .titleWithStatus(acceptsQuestion ? "Nuevo chat" : "Chat")
@@ -184,7 +191,11 @@ struct ChatView: View {
                 }
             }
         }
-        .onAppear { if history.currentMessages.isEmpty && !assistant.isBusy { isInputFocused = true } }
+        .task {
+            // Focusing while the sheet is still sliding in does not bring up the keyboard.
+            try? await Task.sleep(for: .milliseconds(500))
+            if acceptsQuestion { isInputFocused = true }
+        }
     }
 
     private var suggestionsView: some View {
@@ -267,6 +278,25 @@ struct ChatView: View {
         }
     }
 
+    /// Save is always available; «Entendido» only appears right after the answer finishes, not when rereading a chat.
+    private func actionBar(_ m: Message) -> some View {
+        VStack(spacing: 8) {
+            Button { history.toggleSaved(m.id) } label: {
+                Label(m.isSaved ? "Guardada" : "Guardar pregunta", systemImage: m.isSaved ? "bookmark.fill" : "bookmark")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(Theme.save)
+            if justAnswered {
+                Button { dismiss() } label: {
+                    Text("Entendido").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .controlSize(.large)
+    }
+
     private var canSend: Bool { !assistant.isBusy && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     private func send(_ q: String) {
@@ -278,6 +308,7 @@ struct ChatView: View {
         Task {
             if let m = await assistant.ask(q) {
                 history.add(m, to: id)
+                justAnswered = true
             } else if text.isEmpty {
                 text = q   // on failure, the question goes back in the box to retry
             }

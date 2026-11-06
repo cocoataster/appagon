@@ -20,6 +20,9 @@ targets:
                                    # (no se llama «Resources»: en iOS ese nombre en la raíz de la app da problemas al instalar)
         type: folder
         buildPhase: resources
+      - path: Assets.xcassets      # icono de la app
+      - path: PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - framework: vendor/llama.cpp/build-apple/llama.xcframework
         embed: true
@@ -30,6 +33,9 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: "Apagón"
+        CFBundleShortVersionString: $(MARKETING_VERSION)   # así subir la versión en settings llega a la app
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false   # solo HTTPS y SHA-256: TestFlight no pide la declaración en cada build
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
     settings:
@@ -37,6 +43,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: es.ericsans.apagon
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ${APAGON_TEAM}
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         ENABLE_USER_SCRIPT_SANDBOXING: NO

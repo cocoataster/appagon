@@ -16,7 +16,6 @@ struct QuestionBubble: View {
 }
 
 struct AnswerView: View {
-    @EnvironmentObject private var history: History
     let m: Message
 
     var body: some View {
@@ -50,20 +49,9 @@ struct AnswerView: View {
                 .tint(.secondary)
             }
 
-            HStack {
-                Text(m.date.formatted(date: .abbreviated, time: .shortened))
-                Spacer()
-                Button { history.toggleSaved(m.id) } label: {
-                    Image(systemName: m.isSaved ? "bookmark.fill" : "bookmark")
-                        .font(.title2)
-                        .foregroundStyle(m.isSaved ? Theme.accent : .secondary)
-                        .frame(width: 44, height: 44, alignment: .trailing)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel(m.isSaved ? "Quitar de guardadas" : "Guardar")
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+            Text(m.date.formatted(date: .abbreviated, time: .shortened))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 }
@@ -89,7 +77,7 @@ struct SavedView: View {
             Group {
                 if history.saved.isEmpty {
                     ContentUnavailableView("Nada guardado", systemImage: "bookmark",
-                                           description: Text("Toca el marcador debajo de una respuesta para tenerla aquí."))
+                                           description: Text("Toca «Guardar pregunta» al terminar una respuesta para tenerla aquí."))
                 } else {
                     List {
                         ForEach(history.savedByCategory, id: \.category) { group in
