@@ -80,6 +80,7 @@ final class Assistant: ObservableObject {
     @Published var downloadingID: String?    // the model being downloaded right now
 
     private var engine: Engine?
+    private var needsReload = false   // after a llama failure the context stays broken: every later call would fail too
 
     func load() async {
         guard engine == nil else { return }
@@ -173,7 +174,13 @@ final class Assistant: ObservableObject {
     @discardableResult
     func ask(_ q: String) async -> Message? {
         let q = q.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let engine, !q.isEmpty, !isBusy else { return nil }
+        guard !q.isEmpty, !isBusy else { return nil }
+        if needsReload {
+            needsReload = false
+            engine = nil
+            await load()
+        }
+        guard let engine, !isBusy else { return nil }
         question = q
         answer = ""
         calculations = []
@@ -211,6 +218,7 @@ final class Assistant: ObservableObject {
                            correction: correction, metrics: metrics)
         } catch {
             status = .error(error.localizedDescription)
+            needsReload = true
             return nil
         }
     }
