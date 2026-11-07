@@ -27,6 +27,8 @@ cd ~/Documents/PTA/"PTA - Eric Sans"/proyecto-apagon
 bash app/preparar.sh
 ```
 
+Antes, para ejecutar en un iPhone, escribe tu Team ID de Apple en `app/equipo.txt` (no se sube al repo); si no, elige el equipo en Xcode → Signing & Capabilities.
+
 El script instala `cmake` y `xcodegen` si faltan, compila llama.cpp para iOS (versión fija `b12038`, ~10–20 min la primera vez), copia los dos modelos, exporta los datos desde `eval/pipeline.py`, comprueba en Swift que reglas y calculadoras dan lo mismo que en Python y genera `app/Apagon.xcodeproj`.
 
 ## Ejecutar en el simulador

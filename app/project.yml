@@ -43,7 +43,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: es.ericsans.apagon
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ${APAGON_TEAM}
+        DEVELOPMENT_TEAM: ${APAGON_TEAM}   # se toma de app/equipo.txt (no se sube): ver preparar.sh
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "2"
         ENABLE_USER_SCRIPT_SANDBOXING: NO

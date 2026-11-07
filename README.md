@@ -80,7 +80,9 @@ Todo con temperatura 0, semilla 42 y sin modo razonamiento. La app se prepara co
 
 ## Derechos
 
-Las guías son de sus autores. El repo no incluye los documentos originales (`data/guias/` queda fuera y `rag/build_index.py` los descarga), pero `rag/index.json` y los datos de `finetune/data/` contienen fragmentos de su texto para que el asistente funcione y el entrenamiento se pueda revisar. Cada fragmento conserva su fuente.
+Las guías son de sus autores. El repo no incluye los documentos originales (`data/guias/` queda fuera y `rag/build_index.py` los descarga), pero `rag/index.json` y los datos de `finetune/data/` contienen fragmentos de su texto para que el asistente funcione y el entrenamiento se pueda revisar. Cada fragmento conserva su fuente. Los datos de entrenamiento se generaron antes de limpiar el índice, así que algunos ejemplos aún contienen texto de webs que no es guía (publicidad o noticias); el índice que usa la app ya está limpio. No se publican las respuestas en bruto del generador ni el índice anterior a la limpieza.
+
+El código está bajo licencia [MIT](LICENSE). La licencia no cubre el texto de las guías ni sus fragmentos, que siguen siendo de sus autores.
 
 ---
 

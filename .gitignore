@@ -17,3 +17,11 @@ app/Contenido/datos/
 app/Info.plist
 app/build/
 app/Apagon.xcodeproj/
+
+# Datos intermedios que no se publican: respuestas en bruto del generador (antes de filtrar)
+# y el índice anterior a la limpieza (llevaba publicidad y noticias de terceros)
+finetune/data/respuestas.jsonl
+rag/index_v2_antes_limpieza.json
+
+# Equipo de firma de Apple de cada desarrollador (lo lee app/preparar.sh)
+app/equipo.txt

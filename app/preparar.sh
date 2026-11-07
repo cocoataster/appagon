@@ -59,6 +59,9 @@ echo "== 5/5 · Comprobación en Swift (sin simulador) y proyecto de Xcode"
 mkdir -p build
 swiftc -O Sources/Pipeline.swift check/main.swift -o build/check
 build/check Contenido/datos
+# Equipo de firma: no va en el repo. Escribe tu Team ID de Apple en app/equipo.txt
+# (o exporta APAGON_TEAM); si no, elígelo en Xcode → Signing & Capabilities.
+if [ -z "${APAGON_TEAM:-}" ] && [ -f equipo.txt ]; then export APAGON_TEAM="$(tr -d '[:space:]' < equipo.txt)"; fi
 xcodegen generate
 echo
 echo "Listo. Abre app/Apagon.xcodeproj, elige un simulador de iPhone y pulsa ▶ (Cmd+R)."
