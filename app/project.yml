@@ -32,7 +32,7 @@ targets:
     info:                          # XcodeGen escribe Info.plist con CFBundleIdentifier y el resto de claves básicas
       path: Info.plist
       properties:
-        CFBundleDisplayName: "Apagón"
+        CFBundleDisplayName: "Appagón"
         CFBundleShortVersionString: $(MARKETING_VERSION)   # así subir la versión en settings llega a la app
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false   # solo HTTPS y SHA-256: TestFlight no pide la declaración en cada build
@@ -45,5 +45,5 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ${APAGON_TEAM}
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
         ENABLE_USER_SCRIPT_SANDBOXING: NO

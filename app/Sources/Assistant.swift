@@ -170,6 +170,14 @@ final class Assistant: ObservableObject {
         }
     }
 
+    /// The models are not on the phone yet: nothing can be asked, so no new chats until the download finishes.
+    var needsModels: Bool {
+        switch status {
+        case .modelsMissing, .downloading, .verifying: return true
+        default: return false
+        }
+    }
+
     /// Answers and returns the finished message (cleaned, with the safety net applied) to store in the history.
     @discardableResult
     func ask(_ q: String) async -> Message? {

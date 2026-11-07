@@ -43,20 +43,19 @@ struct ChatsView: View {
     var body: some View {
         NavigationStack {
             List {
-                switch assistant.status {
-                case .modelsMissing, .downloading:
+                if assistant.needsModels {
                     Section { DownloadCard() }
-                default:
-                    EmptyView()
                 }
 
                 if history.conversations.isEmpty {
-                    Section {
-                        Button { open(nil) } label: {
-                            Label("Haz tu primera pregunta", systemImage: "square.and.pencil")
+                    if !assistant.needsModels {
+                        Section {
+                            Button { open(nil) } label: {
+                                Label("Haz tu primera pregunta", systemImage: "square.and.pencil")
+                            }
+                        } footer: {
+                            Text("El modelo y las guías oficiales están en el móvil: funciona sin conexión. Los chats se guardan aquí.")
                         }
-                    } footer: {
-                        Text("El modelo y las guías oficiales están en el móvil: funciona sin conexión. Los chats se guardan aquí.")
                     }
                 } else {
                     ForEach(history.chatsByDay, id: \.day) { group in
@@ -77,6 +76,7 @@ struct ChatsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { open(nil) } label: { Image(systemName: "square.and.pencil") }
+                        .disabled(assistant.needsModels)
                         .accessibilityLabel("Nuevo chat")
                 }
             }
@@ -329,6 +329,13 @@ struct DownloadCard: View {
                 Label("Descargando el asistente", systemImage: "arrow.down.circle").font(.headline)
                 ProgressView(value: fraction)
                 Text(text).font(.footnote.monospacedDigit())
+                Text("No cierres la app hasta que termine.").font(.caption).foregroundStyle(.secondary)
+            }
+        case .verifying(let text):
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Descargando el asistente", systemImage: "arrow.down.circle").font(.headline)
+                ProgressView()
+                Text(text).font(.footnote)
                 Text("No cierres la app hasta que termine.").font(.caption).foregroundStyle(.secondary)
             }
         default:
